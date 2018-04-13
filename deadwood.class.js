@@ -60,8 +60,41 @@ class Player extends Entity
 	setPoints(point) {
 		this.point = point;
 	}
-	woodCollection() {
-		this.point++;
+	woodCollection(iswood) {
+		if (iswood)
+			this.point += Math.floor(Math.random() * 10);
+	}
+}
+
+class Resources
+{
+	constructor(relief) {
+		this.resImg = new Image();
+		this.resImg.src = '../img/dwood.png';
+		this.location = [];
+		for (var i = 0; i < 20; i++) {
+			if (Math.random() > 0.5)
+				this.location[i] = relief[Math.floor(i / 2)] - 8;
+			else
+				this.location[i] = 0;
+		}
+	}
+	draw(ctx) {
+		for (var i = 0; i < this.location.length; i++)
+			if (this.location[i] != 0) {
+				ctx.beginPath();	
+				ctx.drawImage(this.resImg, i * 32, this.location[i]);
+				ctx.stroke();
+			}
+	}
+	isWood(x) {
+		var area = Math.floor(x / 32);
+		if (this.location[area] != 0) {
+			this.location[area] = 0;
+			return true;
+		}
+		else
+			return false;
 	}
 }
 
@@ -110,6 +143,6 @@ class Interface
 		ctx.fillRect(10, 10, 620, 40);
 		ctx.font = '20pt Roboto';
 		ctx.fillStyle = '#eee';
-		ctx.fillText('X:' + x + ' Y:' + y + ' Score:' + point + ' FPS:' + Math.floor(1000 / ms), 15, 35);
+		ctx.fillText('X:' + x + '   Y:' + y + '   Score:' + point + '   FPS:' + Math.floor(1000 / ms), 15, 35);
 	}
 }
