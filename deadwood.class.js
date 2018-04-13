@@ -1,6 +1,6 @@
 class Entity 
 {
-	constructor(image, x = 0, y = 0, w, h) {
+	constructor(image, x = 0, y = 0, w, h, step) {
 		this.entityImg = new Image();
 		this.entityImg.src = image;
 		this.x = x;
@@ -9,30 +9,40 @@ class Entity
 		this.h = h;
 		this.g = 0;
 		this.jumping = false;
+		this.step = step;
+		this.dir = 1;
 	}
 	draw(ctx) {
 		ctx.beginPath();	
 		ctx.drawImage(this.entityImg, this.x - this.w / 2, this.y - this.h, this.w, this.h);
 		ctx.stroke();
 	}
-	gravity(relief) {
+	gravity(relief, ms) {
 		let h = relief[Math.floor(this.x / 64)];
 		if (this.y != h) {
+			this.jumping = true;
 			this.g++;
+			let dy = Math.floor(this.g * ms / (25));
 			if (this.y < h)
-				this.y += this.g;
-			else if (this.y > h) {
+				this.y += dy
+			if (this.y > h) {
 				this.y = h;
 				this.g = 0;
-				this.jumping = false;
 			}
 		}
+		else
+			this.jumping = false;
 	}
-	moving(direction, relief) {
-		if (direction == 'r' && (relief[Math.floor((this.x + 2)/ 64)] >= this.y || this.jumping))
-			this.x += 2;
-		else if (direction == 'l' && (relief[Math.floor((this.x - 2)/ 64)] >= this.y || this.jumping))
-			this.x -= 2;
+	moving(direction, relief, ms) {
+		let dx = Math.floor(this.step * (ms / 25));
+		if (direction == 1 && relief[Math.floor((this.x + this.step + 6)/ 64)] >= this.y) {
+			this.x += dx;
+			this.dir = 1;
+		}
+		else if (direction == -1 && relief[Math.floor((this.x - this.step - 6)/ 64)] >= this.y) {
+			this.x -= dx;
+			this.dir = -1;
+		}
 		if (this.x < 0)
 			this.x = 0;
 		//console.log(relief[Math.floor(this.x / 64)]);
@@ -40,14 +50,19 @@ class Entity
 	}
 	jump() {
 		this.y--;
-		this.g = -12;
+		this.g = -13;
 		this.jumping = true;
 	}
 }
 
 class Player extends Entity
 {
-	
+	setPoints(point) {
+		this.point = point;
+	}
+	woodCollection() {
+		this.point++;
+	}
 }
 
 class Wood
@@ -89,12 +104,12 @@ class Interface
 	constructor() {
 
 	}
-	draw(ctx, x, y) {
+	draw(ctx, x, y, point, ms) {
 		ctx.fillStyle = '#333333';
 		ctx.strokeStyle = '#000';
 		ctx.fillRect(10, 10, 620, 40);
 		ctx.font = '20pt Roboto';
 		ctx.fillStyle = '#eee';
-		ctx.fillText('X:' + x + ' Y:' + y, 15, 35);
+		ctx.fillText('X:' + x + ' Y:' + y + ' Score:' + point + ' FPS:' + Math.floor(1000 / ms), 15, 35);
 	}
 }
