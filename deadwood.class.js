@@ -1,6 +1,7 @@
+/*jshint esversion: 6 */
 class Entity 
 {
-	constructor(image, x = 0, y = 0, w, h, step) {
+	constructor(image, x, y, w, h, step) {
 		this.entityImg = new Image();
 		this.entityImg.src = image;
 		this.x = x;
@@ -11,6 +12,7 @@ class Entity
 		this.jumping = false;
 		this.step = step;
 		this.dir = 1;
+		this.backZone = 0;
 	}
 	draw(ctx) {
 		ctx.beginPath();	
@@ -18,13 +20,13 @@ class Entity
 		ctx.stroke();
 	}
 	gravity(relief, ms) {
-		let h = relief[Math.floor(this.x / 64)];
+		let h = relief[Math.floor((this.x + this.backZone) / 64)];
 		if (this.y != h) {
 			this.jumping = true;
 			this.g++;
 			let dy = Math.floor(this.g * ms / (25));
 			if (this.y < h)
-				this.y += dy
+				this.y += dy;
 			if (this.y > h) {
 				this.y = h;
 				this.g = 0;
@@ -34,15 +36,11 @@ class Entity
 			this.jumping = false;
 	}
 	moving(direction, relief, ms) {
-		let dx = Math.floor(this.step * (ms / 25));
-		if (direction == 1 && relief[Math.floor((this.x + this.step + 6)/ 64)] >= this.y) {
+		let dx = direction * Math.floor(this.step * (ms / 25));
+		let position = Math.floor(this.x / 32);
+		if (relief[Math.floor((this.x + direction * (this.step + 6))/ 64)] >= this.y)
 			this.x += dx;
-			this.dir = 1;
-		}
-		else if (direction == -1 && relief[Math.floor((this.x - this.step - 6)/ 64)] >= this.y) {
-			this.x -= dx;
-			this.dir = -1;
-		}
+		//Left wool
 		if (this.x < 0)
 			this.x = 0;
 		//console.log(relief[Math.floor(this.x / 64)]);
@@ -57,12 +55,46 @@ class Entity
 
 class Player extends Entity
 {
-	setPoints(point) {
+	setVars(point) {
 		this.point = point;
+		this.load = 0;
 	}
-	woodCollection(iswood) {
-		if (iswood)
-			this.point += Math.floor(Math.random() * 10);
+	draw(ctx) {
+		ctx.beginPath();	
+		ctx.drawImage(this.entityImg, this.x - this.w / 2, this.y - this.h, this.w, this.h);
+		ctx.stroke();
+		if (this.load != 0)
+			this.drawColl(ctx);
+	}
+	woodCollection() {
+		this.point += Math.floor(Math.random() * 10);
+	}
+	drawColl(ctx) {
+		let state = this.load;
+		ctx.fillStyle = 'white';
+		ctx.fillRect(this.x - 16, this.y - 74, 2 * state, 2);
+		state = 16 - state;
+		if (state != 0) {
+			ctx.fillStyle = 'gray';
+			ctx.fillRect(this.x + 16, this.y - 74, -2 * state, 2);
+		}
+	}
+	moving(direction, relief, ms) {
+		let dx = direction * Math.floor(this.step * (ms / 25));
+		if (relief[Math.floor(((this.x + this.backZone) + direction * (this.step + 6))/ 64)] >= this.y)
+			this.x += dx;
+		//Left wool
+		if (this.x < 0)
+			this.x = 0;
+		if (this.x > 320) {
+			this.backZone += this.x - 320;
+			this.x = 320;
+		}
+		//console.log(relief[Math.floor(this.x / 64)]);
+		//console.log('moving');
+	}
+	request() {
+		console.log('x=' + (this.x + this.backZone) + ' chank=' + Math.floor((this.x + this.backZone)/ 64));
 	}
 }
 
@@ -72,61 +104,68 @@ class Resources
 		this.resImg = new Image();
 		this.resImg.src = '../img/dwood.png';
 		this.location = [];
-		for (var i = 0; i < 20; i++) {
+		let length = relief.length * 2;
+		for (var i = 0; i < length; i++) {
 			if (Math.random() > 0.5)
 				this.location[i] = relief[Math.floor(i / 2)] - 8;
 			else
 				this.location[i] = 0;
 		}
 	}
-	draw(ctx) {
+	draw(ctx, backZone) {
 		for (var i = 0; i < this.location.length; i++)
 			if (this.location[i] != 0) {
 				ctx.beginPath();	
-				ctx.drawImage(this.resImg, i * 32, this.location[i]);
+				ctx.drawImage(this.resImg, i * 32 - backZone, this.location[i]);
 				ctx.stroke();
 			}
 	}
+	collection(player) { 
+		this.location[Math.floor((player.x + player.backZone) / 32)] = 0;
+	}
 	isWood(x) {
 		var area = Math.floor(x / 32);
-		if (this.location[area] != 0) {
-			this.location[area] = 0;
+		if (this.location[area] != 0)
 			return true;
-		}
 		else
 			return false;
 	}
 }
 
-class Wood
+class Background
 {
 	constructor() {
 		this.woodImg = new Image();
 		this.woodImg.src = '../img/wood.jpg';
 	}
-	draw(ctx) {
-		ctx.beginPath();	
-		ctx.drawImage(this.woodImg, 0, 0, 640, 400);
+	draw(ctx, x) {
+		ctx.beginPath();
+		if (x < 320)	
+			ctx.drawImage(this.woodImg, 0, 0, 640, 400);
+		else {
+			ctx.drawImage(this.woodImg, (160 - x / 2 + 640 * Math.floor((x - 320) / 1280)), 0, 640, 400);
+			ctx.drawImage(this.woodImg, (800 - x / 2 + 640 * Math.floor((x - 320) / 1280)), 0, 640, 400);
+		}
 		ctx.stroke();
 	}
 }
 
 class Ground
 {
-	constructor(image) {
+	constructor(image, length) {
 		this.relief = [];
 		this.grassImg = new Image();
 		this.grassImg.src = image;
-		for (var i = 0; i < 10; i++) {
+		for (var i = 0; i < length; i++) {
 			this.relief[i] = 400 - (Math.floor(Math.random() * (3 - 1)) + 1) * 32;
 		}
 	}
 	//Рисование рельефа
-	draw(ctx) {
-		for (var i = 0; i < 10; i++) {
+	draw(ctx, backZone) {
+		for (var i = 0; i < this.relief.length; i++) {	//	НУЖНО СДЕЛАТЬ ЧТОБЫ РИСОВАЛАСЬ ТОЛЬКО ЧАСТЬ РЕЛЬЕФА
 			var rand = this.relief[i];
 			ctx.beginPath();	
-			ctx.drawImage(this.grassImg, i * 64, rand);
+			ctx.drawImage(this.grassImg, i * 64 - backZone, rand);
 			ctx.stroke();
 		}
 	}
@@ -144,5 +183,47 @@ class Interface
 		ctx.font = '20pt Roboto';
 		ctx.fillStyle = '#eee';
 		ctx.fillText('X:' + x + '   Y:' + y + '   Score:' + point + '   FPS:' + Math.floor(1000 / ms), 15, 35);
+	}
+}
+
+class Fire 
+{
+	constructor(image, w, h) {
+		this.w = w;
+		this.h = h;
+		this.image = new Image();
+		this.image.src = image;
+	}
+	draw(ctx, x, y) {
+		ctx.beginPath();	
+		ctx.drawImage(this.image, x - this.w / 2, y - this.h / 2);
+		ctx.stroke();
+	}
+}
+
+class DWFuncs
+{
+	constructor() {}
+	//Deadwood collection function
+	static collManager(player, dwood) {
+		let position = Math.floor(player.x / 32);
+		if (dwood.isWood(player.x + player.backZone) && !player.jumping) {
+			//Функция отображения сбора дерева
+			let i = 0;
+			let loading = setInterval(function() {
+				i++;
+				player.load = i;
+			}, 50);
+			//Функция сбора дерева
+			setTimeout(function() {
+				if (position == Math.floor(player.x / 32) && !player.jumping) {
+					player.woodCollection();
+					dwood.collection(player);
+				}
+				clearInterval(loading);
+				player.load = 0;
+			}, 850);
+			// +++ Добавить функцию прерывания всего при прыжке и т.д.
+		}
 	}
 }
