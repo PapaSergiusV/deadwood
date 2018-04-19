@@ -1,7 +1,7 @@
 /*jshint esversion: 6 */
 class Entity 
 {
-  constructor(image, x, y, w, h, step) {
+  constructor(image, x, y, w, h, step = 2, radiusView = 5) {
     this.entityImg = new Image();
     this.entityImg.src = image;
     this.x = x;
@@ -12,18 +12,24 @@ class Entity
     this.jumping = false;
     this.step = step;
     this.dir = 1;
-    this.backZone = 0;
+    this.stop = true;
+    Entity.count += 1;
+    this.name = "ent" + Entity.count;
+    this.goTo = -1;
+    this.radiusView = radiusView;
+    this.collecting = false;
+    this.died = false;
   }
-  draw(ctx) {
+  draw(ctx, backZonePlayer) {
     ctx.beginPath();  
-    ctx.drawImage(this.entityImg, this.x - this.w / 2, this.y - this.h, this.w, this.h);
+    ctx.drawImage(this.entityImg, this.x - this.w / 2 - backZonePlayer, this.y - this.h, this.w, this.h);
     ctx.stroke();
   }
   gravity(relief, ms) {
-    let h = relief[Math.floor((this.x + this.backZone) / 64)];
+    let h = relief[Math.floor(this.x / 64)];
     if (this.y != h) {
       this.jumping = true;
-      this.g++;
+      this.g += Math.floor(1 * ms / 25);
       let dy = Math.floor(this.g * ms / (25));
       if (this.y < h)
         this.y += dy;
@@ -35,29 +41,23 @@ class Entity
     else
       this.jumping = false;
   }
-  moving(direction, relief, ms) {
-    let dx = direction * Math.floor(this.step * (ms / 25));
-    let position = Math.floor(this.x / 32);
-    if (relief[Math.floor((this.x + direction * (this.step + 6))/ 64)] >= this.y)
-      this.x += dx;
-    //Left wool
-    if (this.x < 0)
-      this.x = 0;
-    //console.log(relief[Math.floor(this.x / 64)]);
-    //console.log('moving');
-  }
+  
   jump() {
     this.y--;
-    this.g = -13;
+    this.g = -11;
     this.jumping = true;
   }
 }
+Entity.count = 0;
 
 class Player extends Entity
 {
   setVars(point) {
     this.point = point;
     this.load = 0;
+    this.backZone = 0;
+    delete this.goTo;
+    delete this.radiusView;
   }
   draw(ctx) {
     ctx.beginPath();  
@@ -67,7 +67,7 @@ class Player extends Entity
       this.drawColl(ctx);
   }
   woodCollection() {
-    this.point += Math.floor(Math.random() * 10);
+    this.point += Math.round(Math.random() * 9 + 1);
   }
   drawColl(ctx) {
     let state = this.load;
@@ -79,9 +79,9 @@ class Player extends Entity
       ctx.fillRect(this.x + 16, this.y - 74, -2 * state, 2);
     }
   }
-  moving(direction, relief, ms) {
-    let dx = direction * Math.floor(this.step * (ms / 25));
-    if (relief[Math.floor(((this.x + this.backZone) + direction * (this.step + 6))/ 64)] >= this.y)
+  moving(relief, ms) {
+    let dx = this.dir * Math.floor(this.step * (ms / 25));
+    if (relief[Math.floor(((this.x + this.backZone) + this.dir * (this.step + 6))/ 64)] >= this.y)
       this.x += dx;
     //Left wool
     if (this.x < 0)
@@ -90,11 +90,86 @@ class Player extends Entity
       this.backZone += this.x - 320;
       this.x = 320;
     }
-    //console.log(relief[Math.floor(this.x / 64)]);
-    //console.log('moving');
   }
-  request() {
-    console.log('x=' + (this.x + this.backZone) + ' chank=' + Math.floor((this.x + this.backZone)/ 64));
+  gravity(relief, ms) {
+    let h = relief[Math.floor((this.x + this.backZone) / 64)];
+    if (this.y != h) {
+      this.jumping = true;
+      this.g += Math.floor(1 * ms / 25);
+      let dy = Math.floor(this.g * ms / (25));
+      if (this.y < h)
+        this.y += dy;
+      if (this.y > h) {
+        this.y = h;
+        this.g = 0;
+      }
+    }
+    else
+      this.jumping = false;
+  }
+}
+
+class Rival extends Entity
+{
+  AI(obj, relief, dwood, ms) {
+    if (this.goTo == -1) {
+      if (!this.died) 
+        this.searchDwood(dwood);
+      if (this.goTo == -1 && !this.died) 
+        this.dying(obj);
+    }
+    else {
+      if (Math.abs(this.x - this.goTo) > 3)
+        this.moving(relief, ms);
+      else if (!this.collecting){
+        this.collecting = true;
+        this.woodCollection(obj, dwood);
+      }
+    }
+  }
+  searchDwood(dwood) {
+    console.log(this.name + " is looking f.w.");
+    if (dwood.isWood(this.x))
+      this.goTo = this.x;
+    else {
+      for (let i = 1; i <= this.radiusView; i++) {
+        let leftView = -32 * i + this.x;
+        let rightView = 32 * i + this.x;
+        if (dwood.isWood(rightView)) {
+          this.goTo = rightView;
+          break;
+        }
+        if (dwood.isWood(leftView)) {
+          this.goTo = leftView;
+          break;
+        }
+      }
+    }
+    if (this.goTo < -1)
+      this.goTo = -1;
+    if (this.goTo != -1)
+      this.dir = this.x < this.goTo ? 1 : -1;
+  }
+  woodCollection(obj, dwood) {
+    setTimeout(function(obj, dwood) {
+      dwood.collection(obj.x);
+      obj.collecting = false;
+      obj.goTo = -1;
+    }, 2000, obj, dwood);
+  }
+  moving(relief, ms) {
+    let dx = this.dir * Math.floor(this.step * (ms / 25));
+    if (relief[Math.floor((this.x + this.dir * (this.step + 6))/ 64)] >= this.y)
+      this.x += dx;
+    else if (!this.jumping) 
+      this.jump();
+    //Left wool
+    if (this.x < 0)
+      this.x = 0;
+  }
+  dying(obj) {
+    console.log(obj.name + " is dying");
+    this.died = true;
   }
 }
 
@@ -122,8 +197,8 @@ class Resources
         ctx.stroke();
       }
   }
-  collection(player) { 
-    this.location[Math.floor((player.x + player.backZone) / 32)] = 0;
+  collection(x) { 
+    this.location[Math.floor(x / 32)] = 0;
   }
   isWood(x) {
     var area = Math.floor(x / 32);
@@ -218,12 +293,15 @@ class Fire
 
 class DWFuncs
 {
-  constructor() {}
+  constructor() {
+    this.collectorWorking = false;
+  }
   //Deadwood collection function
   static collManager(player, dwood) {
     let position = Math.floor(player.x / 32);
     if (dwood.isWood(player.x + player.backZone) && !player.jumping) {
       //Функция отображения сбора дерева
+      player.collecting = true;
       let i = 0;
       let loading = setInterval(function() {
         i++;
@@ -233,12 +311,65 @@ class DWFuncs
       setTimeout(function() {
         if (position == Math.floor(player.x / 32) && !player.jumping) {
           player.woodCollection();
-          dwood.collection(player);
+          dwood.collection(player.x + player.backZone);
         }
         clearInterval(loading);
         player.load = 0;
+        player.collecting = false;
       }, 850);
       // +++ Добавить функцию прерывания всего при прыжке и т.д.
     }
   }
+  //Управление персонажем
+  static movingManager(player, ground, dwood, ms) {
+    addEventListener("keydown", function(e) {
+      if (player.stop) {
+        if      (e.keyCode == 68)   { player.dir = 1;  player.stop = false; }
+        else if (e.keyCode == 65)   { player.dir = -1; player.stop = false; }
+      }
+      else if   (e.keyCode == 16 && !player.jumping)    player.jump();
+      if        (!player.collecting && e.keyCode == 83) DWFuncs.collManager(player, dwood);
+    });
+    addEventListener("keyup", function(e) {
+      if (e.keyCode == 68 || e.keyCode == 65)
+        player.stop = true;
+    });
+    if (!player.stop) {
+      player.moving(ground.relief, ms);
+    }
+  }
+  //Цикл по соперникам
+  static rivalForeach(node, ctx, backZonePlayer, relief, dwood, ms) {
+    function inside(node) {
+      if (node != null) {
+        //if (!node.data.collection)
+        //  node.data.moving(relief, ms);
+        /*if (dwood.isWood(node.data.x)) {
+          node.data.collection = true;
+          setTimeout(function() {
+            dwood.collection(node.data.x);
+            node.data.collection = false;
+          }, 1000);
+        }*/
+        node.data.AI(node.data, relief, dwood, ms);
+        //console.log(node.data.goTo);
+        node.data.gravity(relief, ms);
+        node.data.draw(ctx, backZonePlayer);
+        if (node.next != null)
+          inside(node.next);
+      }
+    }
+    inside(node);
+  }
+  //Удаление умерших ботов
+  static collector(...list) {
+    //console.log("Collector is working");
+    this.collectorWorking = true;
+    for (var i = 0; i < list.length; i++)
+      list[i].removeAllByCond(b => b.data.died == true);
+  }
 }
+
+//Notes
+
+//rivals.removeAllByCond(x => x.data.name == "Enemy1" || x.data.name == "Enemy2")
