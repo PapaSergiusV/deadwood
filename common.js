@@ -5,22 +5,22 @@ let screen    = document.getElementById('screen');
 let ctx       = screen.getContext('2d');
 let time      = new Date();
 let ms        = 20;
-let mapLength = 100;
+let mapLength = 300;      
 
 //Инициализация объектов классов
 let wood      = new Background();
 let ground    = new Ground('../img/grass.jpg', mapLength);
-let player    = new Player('../img/player.png', 16, 300, 32, 64, 3.4); player.setVars(0);
+let player    = new Player('../img/player2.png', 16, 300, 51, 64, 3.4); player.setVars(0);
 let dwood     = new Resources(ground.relief);
 let scores    = new Interface(); 
 let torch     = new Fire('../img/fireInTheDark.png', 1280, 800);
-let rivals    = new LinkedList(
+let rivals    = new LinkedList(/*
                 new Rival('../img/player.png', 336, 300, 32, 64),
                 new Rival('../img/player.png', 136, 300, 32, 64),
                 new Rival('../img/player.png', 264, 300, 32, 64),
-                new Rival('../img/player.png', 736, 300, 32, 64),
+                new Rival('../img/player.png', 736, 300, 32, 64), 
                 new Rival('../img/player.png', 608, 300, 32, 64),
-                new Rival('../img/player.png', 496, 100, 32, 64));
+                new Rival('../img/player.png', 496, 100, 32, 64)*/);
 
 //Главная функция игры
 if (ctx) setInterval(render, 25); 
@@ -47,5 +47,6 @@ function render() {
   frame++; 
 }
 
-//Сборщик мусора
+//CYCLES (that don't depend on main func)
 setInterval(DWFuncs.collector, 10000, (rivals));
+setInterval(DWFuncs.newRival,  10000, (rivals), (player), (mapLength));

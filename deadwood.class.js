@@ -1,7 +1,7 @@
 /*jshint esversion: 6 */
 class Entity 
 {
-  constructor(image, x, y, w, h, step = 2, radiusView = 5) {
+  constructor(image, x, y, w, h, step = 2.3, radiusView = 8) {
     this.entityImg = new Image();
     this.entityImg.src = image;
     this.x = x;
@@ -22,7 +22,14 @@ class Entity
   }
   draw(ctx, backZonePlayer) {
     ctx.beginPath();  
-    ctx.drawImage(this.entityImg, this.x - this.w / 2 - backZonePlayer, this.y - this.h, this.w, this.h);
+    if (this.stop) 
+      ctx.drawImage(this.entityImg, 0, 100 * (this.dir == 1 ? 0 : 1), 80, 100, this.x - this.w / 2 - backZonePlayer, 
+        this.y - this.h, 51, 64);
+    else {
+      let cadr = Math.floor((this.x) / 20);
+      ctx.drawImage(this.entityImg, 80 * (cadr % 4), 100 * (this.dir == 1 ? 0 : 1), 80, 100, 
+        this.x - this.w / 2 - backZonePlayer, this.y - this.h, 51, 64);
+    }
     ctx.stroke();
   }
   gravity(relief, ms) {
@@ -48,7 +55,7 @@ class Entity
     this.jumping = true;
   }
 }
-Entity.count = 0;
+Entity.count = -1;
 
 class Player extends Entity
 {
@@ -61,7 +68,14 @@ class Player extends Entity
   }
   draw(ctx) {
     ctx.beginPath();  
-    ctx.drawImage(this.entityImg, this.x - this.w / 2, this.y - this.h, this.w, this.h);
+    if (this.stop)
+      ctx.drawImage(this.entityImg, 0, 100 * (this.dir == 1 ? 0 : 1), 80, 100, this.x - this.w / 2, 
+        this.y - this.h, 51, 64);
+    else {
+      let cadr = Math.floor((this.x + this.backZone) / 20);
+      ctx.drawImage(this.entityImg, 80 * (cadr % 4), 100 * (this.dir == 1 ? 0 : 1), 80, 100,
+       this.x - this.w / 2, this.y - this.h, 51, 64);
+    }
     ctx.stroke();
     if (this.load != 0)
       this.drawColl(ctx);
@@ -119,16 +133,19 @@ class Rival extends Entity
         this.dying(obj);
     }
     else {
-      if (Math.abs(this.x - this.goTo) > 3)
+      if (Math.abs(this.x - this.goTo) > 3) {
+        this.stop = false;
         this.moving(relief, ms);
+      }
       else if (!this.collecting){
+        this.stop = true;
         this.collecting = true;
         this.woodCollection(obj, dwood);
       }
     }
   }
   searchDwood(dwood) {
-    console.log(this.name + " is looking f.w.");
+    //console.log(this.name + " is looking f.w.");
     if (dwood.isWood(this.x))
       this.goTo = this.x;
     else {
@@ -145,7 +162,7 @@ class Rival extends Entity
         }
       }
     }
-    if (this.goTo < -1)
+    if (this.goTo < 8 || this.goTo > 19192)
       this.goTo = -1;
     if (this.goTo != -1)
       this.dir = this.x < this.goTo ? 1 : -1;
@@ -155,7 +172,7 @@ class Rival extends Entity
       dwood.collection(obj.x);
       obj.collecting = false;
       obj.goTo = -1;
-    }, 2000, obj, dwood);
+    }, 1000, obj, dwood);
   }
   moving(relief, ms) {
     let dx = this.dir * Math.floor(this.step * (ms / 25));
@@ -168,7 +185,7 @@ class Rival extends Entity
       this.x = 0;
   }
   dying(obj) {
-    console.log(obj.name + " is dying");
+    console.log("--- " + obj.name);
     this.died = true;
   }
 }
@@ -202,7 +219,9 @@ class Resources
   }
   isWood(x) {
     var area = Math.floor(x / 32);
-    if (this.location[area] != 0)
+    if (area < 0 || area > this.location.length)
+      return false;
+    else if (this.location[area] != 0)
       return true;
     else
       return false;
@@ -213,21 +232,39 @@ class Background
 {
   constructor() {
     this.woodImg = new Image();
-    this.woodImg.src = '../img/wood.jpg';
+    this.woodImg.src = '../img/front.png';
+    this.back = new Image();
+    this.back.src = '../img/back.png';
     this.position = 0;
   }
   draw(ctx, player) {
     ctx.beginPath();
-    if (this.position == 0 && player.x + player.backZone < 320) 
+    ctx.fillStyle = '#555555';
+    ctx.fillRect(0, 0, 640, 400);
+    if (this.position == 0 && player.x + player.backZone < 320) {
+      //back
+      ctx.drawImage(this.back, 0, 0, 640, 400);
+      //front
       ctx.drawImage(this.woodImg, 0, 0, 640, 400);
+    }
     else {
       let x = player.x + player.backZone;
       if (player.x == 320) {
         this.position = x;
+        //back
+        ctx.drawImage(this.back, (80 - x / 4 + 640 * Math.floor((x - 320) / 2560)), 0, 640, 400);
+        ctx.drawImage(this.back, (720 - x / 4 + 640 * Math.floor((x - 320) / 2560)), 0, 640, 400);
+        //front
         ctx.drawImage(this.woodImg, (160 - x / 2 + 640 * Math.floor((x - 320) / 1280)), 0, 640, 400);
         ctx.drawImage(this.woodImg, (800 - x / 2 + 640 * Math.floor((x - 320) / 1280)), 0, 640, 400);
       }
       else {
+        //back
+        ctx.drawImage(this.back, (80 - this.position / 4 +
+         640 * Math.floor((this.position - 320) / 2560)), 0, 640, 400);
+        ctx.drawImage(this.back, (720 - this.position / 4 +
+         640 * Math.floor((this.position - 320) / 2560)), 0, 640, 400);
+        //front
         ctx.drawImage(this.woodImg, (160 - this.position / 2 +
          640 * Math.floor((this.position - 320) / 1280)), 0, 640, 400);
         ctx.drawImage(this.woodImg, (800 - this.position / 2 +
@@ -267,12 +304,15 @@ class Interface
 
   }
   draw(ctx, x, y, point, ms) {
+    ctx.fillStyle = 'black';
+    ctx.fillRect(5, 5, 630, 40);
     ctx.fillStyle = '#333333';
-    ctx.strokeStyle = '#000';
-    ctx.fillRect(10, 10, 620, 40);
-    ctx.font = '20pt Roboto';
+    ctx.fillRect(6, 6, 628, 38);
+
+    ctx.font = '20pt sans-serif';
     ctx.fillStyle = '#eee';
-    ctx.fillText('X:' + x + '   Y:' + y + '   Score:' + point + '   FPS:' + Math.floor(1000 / ms), 15, 35);
+    ctx.fillText('FPS:' + Math.floor(1000 / ms), 540, 360);
+    ctx.fillText('X:' + x + '   Y:' + y + '   Score:' + point, 15, 35);
   }
 }
 
@@ -309,7 +349,7 @@ class DWFuncs
       }, 50);
       //Функция сбора дерева
       setTimeout(function() {
-        if (position == Math.floor(player.x / 32) && !player.jumping) {
+        if (dwood.isWood(player.x + player.backZone) && position == Math.floor(player.x / 32) && !player.jumping) {
           player.woodCollection();
           dwood.collection(player.x + player.backZone);
         }
@@ -342,17 +382,7 @@ class DWFuncs
   static rivalForeach(node, ctx, backZonePlayer, relief, dwood, ms) {
     function inside(node) {
       if (node != null) {
-        //if (!node.data.collection)
-        //  node.data.moving(relief, ms);
-        /*if (dwood.isWood(node.data.x)) {
-          node.data.collection = true;
-          setTimeout(function() {
-            dwood.collection(node.data.x);
-            node.data.collection = false;
-          }, 1000);
-        }*/
         node.data.AI(node.data, relief, dwood, ms);
-        //console.log(node.data.goTo);
         node.data.gravity(relief, ms);
         node.data.draw(ctx, backZonePlayer);
         if (node.next != null)
@@ -368,8 +398,17 @@ class DWFuncs
     for (var i = 0; i < list.length; i++)
       list[i].removeAllByCond(b => b.data.died == true);
   }
+  //Function adds new rival
+  static newRival(list, player, mapLength) {
+    let position = player.x + player.backZone + 600;
+    if (position < mapLength * 64) {
+      list.add(new Rival('../img/rival2.png', position, 300, 51, 64));
+      console.log("add " + (list.last != null ? list.last.data.name : list.first.data.name) +
+       " in " + position);
+    }
+  }
 }
 
-//Notes
+//-----------------Notes-----------------
 
 //rivals.removeAllByCond(x => x.data.name == "Enemy1" || x.data.name == "Enemy2")
