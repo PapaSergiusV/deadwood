@@ -137,11 +137,13 @@ class Rival extends Entity
         this.stop = false;
         this.moving(relief, ms);
       }
-      else if (!this.collecting){
+      else if (!this.collecting && dwood.isWood(this.x)){
         this.stop = true;
         this.collecting = true;
         this.woodCollection(obj, dwood);
       }
+      else 
+        this.goTo = -1;
     }
   }
   searchDwood(dwood) {
@@ -162,7 +164,7 @@ class Rival extends Entity
         }
       }
     }
-    if (this.goTo < 8 || this.goTo > 19192)
+    if (this.goTo < 8 || this.goTo > 6394)
       this.goTo = -1;
     if (this.goTo != -1)
       this.dir = this.x < this.goTo ? 1 : -1;
@@ -407,6 +409,20 @@ class DWFuncs
        " in " + position);
     }
   }
+
+  /*static restart(wood, frame, ground, dwood, player, rivals) {
+    wood            = null;
+    wood            = new Background();
+    frame           = 0;
+    //ground          = null;
+    ground          = new Ground('../img/grass.jpg', mapLength);
+    //dwood           = null;
+    dwood           = new Resources(ground.relief);
+    player.x        = 16;
+    player.backZone = 0;
+    while (rivals.first != null)
+      rivals.removeLast();
+  }*/
 }
 
 //-----------------Notes-----------------
