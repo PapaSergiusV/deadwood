@@ -22,14 +22,19 @@ class Entity
   }
   draw(ctx, backZonePlayer) {
     ctx.beginPath();  
-    if (this.stop) 
-      ctx.drawImage(this.entityImg, 0, 100 * (this.dir == 1 ? 0 : 1), 80, 100, this.x - this.w / 2 - backZonePlayer, 
-        this.y - this.h, 51, 64);
-    else {
-      let cadr = Math.floor((this.x) / 20);
-      ctx.drawImage(this.entityImg, 80 * (cadr % 4), 100 * (this.dir == 1 ? 0 : 1), 80, 100, 
-        this.x - this.w / 2 - backZonePlayer, this.y - this.h, 51, 64);
+    if (!this.died) {
+      if (this.stop) 
+        ctx.drawImage(this.entityImg, 0, 100 * (this.dir == 1 ? 0 : 1), 80, 100, this.x - this.w / 2 - backZonePlayer, 
+          this.y - this.h, 51, 64);
+      else {
+        let cadr = Math.floor((this.x) / 20);
+        ctx.drawImage(this.entityImg, 80 * (cadr % 4), 100 * (this.dir == 1 ? 0 : 1), 80, 100, 
+          this.x - this.w / 2 - backZonePlayer, this.y - this.h, 51, 64);
+      }
     }
+    else
+      ctx.drawImage(this.entityImg, 0, 200, 80, 100, 
+        this.x - this.w / 2 - backZonePlayer, this.y - this.h, 51, 64);
     ctx.stroke();
   }
   gravity(relief, ms) {
@@ -63,6 +68,7 @@ class Player extends Entity
     this.point = point;
     this.load = 0;
     this.backZone = 0;
+    this.food = 10;
     delete this.goTo;
     delete this.radiusView;
   }
@@ -286,6 +292,14 @@ class Ground
     for (var i = 0; i < length; i++) {
       this.relief[i] = 400 - (Math.floor(Math.random() * (3 - 1)) + 1) * 32;
     }
+    //+ camp location
+    this.relief[50] = 336;
+    this.relief[51] = 336;
+    this.relief[52] = 336;
+    this.relief[93] = 336;
+    this.relief[94] = 336;
+    this.relief[95] = 336;
+    this.relief[96] = 336;
   }
   //Рисование рельефа
   draw(ctx, backZone) {
@@ -300,21 +314,41 @@ class Ground
   }
 }
 
+class Shop
+{
+  constructor(image, x) {
+    this.img = new Image();
+    this.img.src = image;
+    this.x = x;
+    this.y = 144;
+  }
+  draw(ctx, backZone) {
+    ctx.beginPath();  
+    ctx.drawImage(this.img, this.x - backZone, this.y);
+    ctx.stroke();
+  }
+}
+
 class Interface
 {
   constructor() {
-
   }
-  draw(ctx, x, y, point, ms) {
+  draw(ctx, x, food, wood, buy, ms) {
     ctx.fillStyle = 'black';
     ctx.fillRect(5, 5, 630, 40);
     ctx.fillStyle = '#333333';
     ctx.fillRect(6, 6, 628, 38);
 
+    let txt1 = 'Food:' + food;
+    let txt2 = 'Wood:' + wood;
+    let txt3 = 'Food cost:' + buy;
+
     ctx.font = '20pt sans-serif';
-    ctx.fillStyle = '#eee';
-    ctx.fillText('FPS:' + Math.floor(1000 / ms), 540, 360);
-    ctx.fillText('X:' + x + '   Y:' + y + '   Score:' + point, 15, 35);
+    ctx.fillStyle = '#eee'; 
+
+    ctx.fillText(txt1, 15, 35);
+    ctx.fillText(txt2, 320 - Math.floor(ctx.measureText(txt2).width / 2), 35);
+    ctx.fillText(txt3, 625 - ctx.measureText(txt3).width, 35);
   }
 }
 
@@ -337,6 +371,7 @@ class DWFuncs
 {
   constructor() {
     this.collectorWorking = false;
+    this.playerLastPos = 16;
   }
   //Deadwood collection function
   static collManager(player, dwood) {
@@ -396,33 +431,50 @@ class DWFuncs
   //Удаление умерших ботов
   static collector(...list) {
     //console.log("Collector is working");
-    this.collectorWorking = true;
+    //this.collectorWorking = true;
     for (var i = 0; i < list.length; i++)
       list[i].removeAllByCond(b => b.data.died == true);
   }
   //Function adds new rival
-  static newRival(list, player, mapLength) {
+  static newRival(list, player, location, mapLength) {
     let position = player.x + player.backZone + 600;
-    if (position < mapLength * 64) {
+    if (position < mapLength * 64 && DWFuncs.checkRivalSpawn(location, Math.floor(position / 32))) {
       list.add(new Rival('../img/rival2.png', position, 300, 51, 64));
       console.log("add " + (list.last != null ? list.last.data.name : list.first.data.name) +
        " in " + position);
     }
   }
+  //Function checks whether there are dwoods in the spawn rival place
+  static checkRivalSpawn(location, chunk, visibility = 7) {
+    let flag = false;
+    let from = chunk - visibility;
+    if (from < 0)
+      from = 0;
+    let to = chunk + visibility;
+    if (to > location.length)
+      to = location.length;
+    for (from; from < to; from++) {
+      if (location[from] != 0) {
+        flag = true;
+        break;
+      }
+    }
+    return flag;
+  }
+  static diedWindow(ctx, ms) {
+    ctx.fillStyle = 'black';
+    ctx.fillRect(0, 0, 640, 400);
 
-  /*static restart(wood, frame, ground, dwood, player, rivals) {
-    wood            = null;
-    wood            = new Background();
-    frame           = 0;
-    //ground          = null;
-    ground          = new Ground('../img/grass.jpg', mapLength);
-    //dwood           = null;
-    dwood           = new Resources(ground.relief);
-    player.x        = 16;
-    player.backZone = 0;
-    while (rivals.first != null)
-      rivals.removeLast();
-  }*/
+    let txt1 = 'YOU DIED';
+    let txt2 = 'You have lived';
+    let txt3 = ' ' + Math.floor(ms / 1000) + ' sec ';
+
+    ctx.font = '20pt sans-serif';
+    ctx.fillStyle = '#eee';
+    ctx.fillText(txt1, 320 - Math.floor(ctx.measureText(txt1).width / 2), 190);
+    ctx.fillText(txt2, 320 - Math.floor(ctx.measureText(txt2).width / 2), 220);
+    ctx.fillText(txt3, 320 - Math.floor(ctx.measureText(txt3).width / 2), 250);
+  }
 }
 
 //-----------------Notes-----------------

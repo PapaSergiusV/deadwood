@@ -1,69 +1,120 @@
 /*jshint esversion: 6 */
-//Переменные common.js
-let frame     = 0;
-let screen    = document.getElementById('screen');
-let ctx       = screen.getContext('2d');
-let time      = new Date();
-let ms        = 20;
-let mapLength = 100;
-
-//INITIALISATION OBJECTS
-let wood      = new Background();
-let ground    = new Ground('../img/grass.jpg', mapLength);
-let player    = new Player('../img/player2.png', 16, 300, 51, 64, 3.4); player.setVars(0);
-let dwood     = new Resources(ground.relief);
-let scores    = new Interface(); 
-let torch     = new Fire('../img/fireInTheDark.png', 1280, 800);
-let rivals    = new LinkedList(/*
-                new Rival('../img/player.png', 336, 300, 32, 64),
-                new Rival('../img/player.png', 136, 300, 32, 64),
-                new Rival('../img/player.png', 264, 300, 32, 64),
-                new Rival('../img/player.png', 736, 300, 32, 64), 
-                new Rival('../img/player.png', 608, 300, 32, 64),
-                new Rival('../img/player.png', 496, 100, 32, 64)*/);
+//GLOBAL VARS & CYCLES
+let player      = new Player('../img/player2.png', 16, 300, 51, 64, 3.4); player.setVars(0);
+var gameIsRunning = false;
+var game;
+var rivalCycle;
+var collectorCycle;
+var buyCycle;
+var eatCycle;
+var glbuy = 18;
+let lifetime  = new Date();
 
 //GAME MAIN FUNCTION
-if (ctx) setInterval(render, 25); 
+function main() {
+  gameIsRunning = true;
+  //vars & objects
+  let frame     = 0;
+  let screen    = document.getElementById('screen');
+  let ctx       = screen.getContext('2d');
+  let time      = new Date();
+  let ms        = 20;
+  let mapLength = 100;
+  let buy       = glbuy;
 
-function render() {
-  ms = new Date() - time;
-  time = new Date();
+  let wood      = new Background();
+  let ground    = new Ground('../img/grass.jpg', mapLength);
+  let dwood     = new Resources(ground.relief);
+  let scores    = new Interface(); 
+  let torch     = new Fire('../img/fireInTheDark.png', 1400, 875);
+  let rivals    = new LinkedList();
+  let shop      = new Shop('../img/shop.png', 6000);
+  let mshop     = new Shop('../img/shop.png', 3200);
 
-  //MECHANICS
-  DWFuncs.movingManager(player, ground, dwood, ms); 
-  player.gravity(ground.relief, ms);
-  if (player.backZone > 5760)
-    restart();
+  if (ctx) 
+    game = setInterval(render, 25); 
 
-  //DRAW
-  wood.draw(ctx, player);
-  ground.draw(ctx, player.backZone);
-  dwood.draw(ctx, player.backZone);
-  player.draw(ctx);
-  torch.draw(ctx, player.x, player.y - 48);
-  scores.draw(ctx, player.x + player.backZone, player.y, player.point, ms);
+  //MAIN GAME CYCLE
+  function render() {
+    ms = new Date() - time;
+    time = new Date();
 
-  //CYCLES
-  DWFuncs.rivalForeach(rivals.first, ctx, player.backZone, ground.relief, dwood, ms);
+    //mechanics
+    DWFuncs.movingManager(player, ground, dwood, ms); 
+    player.gravity(ground.relief, ms);
+    if (player.backZone > 5760)
+      stop();
 
-  frame++; 
+    //draw & enemy cycles
+    ctx.clearRect(0, 0, 640, 400);
+    wood.draw(ctx, player);
+    ground.draw(ctx, player.backZone);
+    dwood.draw(ctx, player.backZone);
+    shop.draw(ctx, player.backZone);
+    mshop.draw(ctx, player.backZone);
+
+    DWFuncs.rivalForeach(rivals.first, ctx, player.backZone, ground.relief, dwood, ms);
+
+    player.draw(ctx);
+    torch.draw(ctx, player.x + (player.dir == 1 ? 20 : -20), player.y - 40);
+    scores.draw(ctx, player.x + player.backZone, player.food, player.point, buy, ms);
+
+    frame++; 
+
+    //dying
+    if (player.food <= 0) {
+      let lived = new Date() - lifetime;
+      DWFuncs.diedWindow(ctx, lived);
+      for (var i = 0; i < dwood.location.length; i++)
+        dwood.location[i] = 0;  
+      stop();
+    }
+
+    //buying
+    if (player.backZone > 2880 && player.backZone < 2944) {
+      player.food += Math.floor(player.point / glbuy);
+      player.point = player.point % glbuy;
+    }
+  }
+
+  //ANOTHER CYCLES (these add or delete bots, these don't depend on render func)
+  rivalCycle      = setInterval(DWFuncs.collector, 20000, (rivals));
+  collectorCycle  = setInterval(DWFuncs.newRival,  10000, (rivals), (player), (dwood.location), (mapLength));
+  buyCycle        = setInterval(function() { let up = Math.floor(glbuy / 10); glbuy += up; buy += up; }, 10000);
+  eatCycle        = setInterval(function() { player.food -= 1; }, 10000);
 }
 
-//CYCLES (that don't depend on main func)
-setInterval(DWFuncs.collector, 10000, (rivals));
-setInterval(DWFuncs.newRival,  10000, (rivals), (player), (mapLength));
+//START FUNCTION
+function start() {
+  if (!gameIsRunning)
+    restart();
+}
 
-//RESTART LEVEL
-function restart() {
-  wood            = null;
-  wood            = new Background();
-  frame           = 0;
-  ground          = null;
-  ground          = new Ground('../img/grass.jpg', mapLength);
-  dwood           = null;
-  dwood           = new Resources(ground.relief);
-  player.x        = 16;
+//STOP FUNCTION
+function stop() {
+  gameIsRunning = false;
+  clearInterval(game);
+  clearInterval(rivalCycle);
+  clearInterval(collectorCycle);
+  clearInterval(buyCycle);
+  clearInterval(eatCycle);
+  player.x = 16;
   player.backZone = 0;
-  while (rivals.first != null)
-    rivals.removeLast();
+
+  if (player.food > 0) {
+    player.food += Math.floor(player.point / glbuy);
+    player.point = player.point % glbuy;
+    main();
+  }
+}
+
+//RESTART LEVEL FUNCTION
+function restart() {
+  player.x = 16;
+  player.backZone = 0;
+  player.food = 10;
+  player.point = 0;  
+  glbuy = 18;
+  lifetime = new Date();
+  main();
 }
