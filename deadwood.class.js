@@ -13,12 +13,12 @@ class Entity
     this.step = step;
     this.dir = 1;
     this.stop = true;
-    Entity.count += 1;
     this.name = "ent" + Entity.count;
     this.goTo = -1;
     this.radiusView = radiusView;
     this.collecting = false;
     this.died = false;
+    Entity.count += 1;
   }
   draw(ctx, backZonePlayer) {
     ctx.beginPath();  
@@ -398,19 +398,21 @@ class DWFuncs
     }
   }
   //Управление персонажем
-  static movingManager(player, ground, dwood, ms) {
-    addEventListener("keydown", function(e) {
-      if (player.stop) {
-        if      (e.keyCode == 68)   { player.dir = 1;  player.stop = false; }
-        else if (e.keyCode == 65)   { player.dir = -1; player.stop = false; }
-      }
-      else if   (e.keyCode == 16 && !player.jumping)    player.jump();
-      if        (!player.collecting && e.keyCode == 83) DWFuncs.collManager(player, dwood);
-    });
-    addEventListener("keyup", function(e) {
-      if (e.keyCode == 68 || e.keyCode == 65)
-        player.stop = true;
-    });
+  static movingManager(player, ground, dwood, ms, firstLaunch = false) {
+    if (firstLaunch) {
+      addEventListener("keydown", function(e) {
+        if (player.stop) {
+          if      (e.keyCode == 68)   { player.dir = 1;  player.stop = false; }
+          else if (e.keyCode == 65)   { player.dir = -1; player.stop = false; }
+        }
+        else if   (e.keyCode == 16 && !player.jumping)    player.jump();
+        if        (!player.collecting && e.keyCode == 83) DWFuncs.collManager(player, dwood);
+      });
+      addEventListener("keyup", function(e) {
+        if (e.keyCode == 68 || e.keyCode == 65)
+          player.stop = true;
+      });
+    }
     if (!player.stop) {
       player.moving(ground.relief, ms);
     }
